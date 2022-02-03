@@ -1,6 +1,7 @@
 "Data preparation and pre-processing scripts"
 
 from utils import *
+from plot import plot_scatter
 
 
 def print_data_stats(df_data):
@@ -29,6 +30,25 @@ def print_data_stats(df_data):
     print(" ---- highest frequency: ", max(words_groups))
 
 
+def plot_all_points_for_words(df, path):
+    "A helper fucntion to plot the trajectories points for all words"
+
+    # removing the points corresponding to the lower body
+    non_related_points = [8, 9, 12, 10, 13, 11, 24, 23, 22, 21, 14, 19, 20]
+    df = df[~df.point.isin(non_related_points)]
+    df["point"] = df["point"].astype(str)
+
+    # for all the words in the data
+    word_groups = df.groupby(by="words")
+    for wname, wgroup in word_groups:
+        fname = 0
+        groups = wgroup.groupby(by="name")
+        for name, group in groups:
+            plot_scatter(group, x="nx", y="ny", labels="point", path=path, filename=name + "_" + str(fname),
+                         directory=wname, title="Scatter plot of points for word " + wname)
+            fname += 1
+
+
 def pre_process(data, drop_cols=None, drop_point=None, drop_pose=None):
     """ A helper function to clean the raw data"""
 
@@ -45,7 +65,7 @@ def pre_process(data, drop_cols=None, drop_point=None, drop_pose=None):
         data = data.drop(drop_cols, axis=1)
 
     # Omit null or empty values
-    data = data[~((data.x.isna()) | (data.y.isna())) | (data.point.isna()) | (data.name.isna()) | (data.frame.isna())
+    data = data[~((data.nx.isna()) | (data.ny.isna())) | (data.point.isna()) | (data.name.isna()) | (data.frame.isna())
                 | (data.SemanticType.isna()) | (data.words.isna())]
 
     # drop duplicated values
@@ -90,6 +110,7 @@ def create_dataset(path_csv, path_txt, drop_cols=None, drop_point=None, drop_pos
 
     # reading the two files
     df_data = read_csv_file(path_csv)
+    print(df_data.typePoint.unique())
     df_semantic_classes = convert_txtfile_to_df(path_txt, separator="\t")
     print("-" * 60)
     print("Words that do not have semantic class: ")
@@ -130,3 +151,67 @@ def create_dataset(path_csv, path_txt, drop_cols=None, drop_point=None, drop_pos
     return dff, df_train, df_test
 
 
+if __name__ == '__main__':
+    # local
+    csv_file_path = "/home/masoumeh/Desktop/MasterThesis/Data/fullVideosClean.csv"
+    txt_file_path = "/home/masoumeh/Desktop/MasterThesis/Data/classessem.txt"
+
+    # server on ... lab
+    # txt_file_path = "/data/home/masoumeh/Data/classessem.txt"
+    # csv_file_path = "/data/home/agora/data/rawData/fullColectionCSV/fullColectionCSV|2022-01-19|03:42:12.csv"
+
+    # non_related_points = [8, 9, 12, 10, 13, 11, 24, 23, 22, 21, 14, 19, 20, 15, 16, 17, 18, 0, 1]
+    dataset, train, test = create_dataset(path_csv=csv_file_path, path_txt=txt_file_path)
+
+    # count the words in each file
+    dataset_groups = dataset.groupby("name")
+    total_gestures = sum([g.words.unique().shape[0] for n, g in dataset_groups])
+    print("total gestures in dataset: ", total_gestures)
+
+    # count the words in each file
+    train_groups = train.groupby("name")
+    train_total = sum([g.words.unique().shape[0] for n, g in train_groups])
+    print("total gestures in train: ", train_total)
+
+    test_groups = test.groupby("name")
+    test_total = sum([g.words.unique().shape[0] for n, g in test_groups])
+    print("total gestures in test: ", test_total)
+
+    print("total (semantic) classes: ", dataset.SemanticType.unique().shape[0])
+    print("total (word) labels: ", dataset.words.unique().shape[0])
+
+    dataset_groups = dataset.groupby(by=["SemanticType", "name"])
+    gesture_groups={"demarcative":0, "deictic":0, "sequential":0}
+    for n, g in dataset_groups:
+        if n[0] == "demarcative":
+            gesture_groups["demarcative"] += g.words.unique().shape[0]
+        if n[0] == "deictic":
+            gesture_groups["deictic"] += g.words.unique().shape[0]
+        if n[0] == "sequential":
+            gesture_groups["sequential"] += g.words.unique().shape[0]
+
+    print("total gestures per (semantic) class:")
+    print(" --- total gestures per `demarcative` class:", gesture_groups["demarcative"])
+    print(" --- total gestures per `deictic` class:", gesture_groups["deictic"])
+    print(" --- total gestures per `sequential` class:", gesture_groups["sequential"])
+
+    # TODO complete the metadata
+    # metadata = pd.DataFrame(columns={"name", "n_rows", "n_gestures", "n_semantic_classes", "n_word_token",
+    #                                  "n_word_type", "n_gesture_per_semantic", "n_gesture_per_word"})
+    # db_name = ["small", "train_small", "test_small"]
+    # n_rows = [dataset.shape[0], train.shape[0], test.shape[0]]
+    # n_gestures = [total_gestures, train_total, test_total]
+    #
+    # metadata["n_rows"] = [dataset.shape[0], train[0]],
+
+    # Writing the results in csv files
+    where_to_write = "/home/masoumeh/Desktop/MasterThesis/Data/"
+    # write_csv_file(dataset, path=where_to_write+"dataset_small.csv")
+    # write_csv_file(train, path=where_to_write+"train_small.csv")
+    # write_csv_file(test, path=where_to_write+"test_small.csv")
+    #
+    # reading the csv files
+    # read_csv_file(where_to_write+"dataset_big.csv")
+
+    path = "/home/masoumeh/Desktop/MasterThesis/Code/BodyGesturePatternDetection/docs/plots/"
+    plot_all_points_for_words(dataset, path=path)

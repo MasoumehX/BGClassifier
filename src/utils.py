@@ -1,4 +1,5 @@
 import os
+import pandas as np
 import pandas as pd
 
 
@@ -91,3 +92,23 @@ def get_freq_power(data, freq_col):
     keys = word_frequency.keys
     values = word_frequency.values
     return keys, values
+
+
+# def zero_pad(a):
+#     """
+#     A function to zero padding
+#     Parameter:
+#         data : a list of all features
+#     Returns:
+#         numpy array
+#     """
+#     df = pd.DataFrame()
+#     df["features"] = a
+#     # flatten
+#     df["flatten"] = df["features"].apply(np.ravel)
+#     df['len'] = df['flatten'].apply(len)
+#     max_vecdim = df['len'].max()
+#     df = df.apply(lambda row: np.pad(row['flatten'], pad_width=(0, max_vecdim - row['len']), mode='constant'),
+#                               axis=1)
+#
+#     return np.stack(df.values)

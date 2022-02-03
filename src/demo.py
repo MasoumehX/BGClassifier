@@ -2,39 +2,14 @@ import time
 import torch
 import numpy as np
 
-from data import *
 from models.baseline import BaseLine
 # from models.nn import FeedForward, learning
 from metric import compute_acc_acc5_f1_prec_rec
 from torch.nn import BCEWithLogitsLoss, Linear, Module, ReLU, Tanh, NLLLoss
 
 
-txt_file_path = "classessem.txt"
-
-# local
-root = "/home/masoumeh/Desktop/MasterThesis/Data/"
-csv_file_path = "fullVideosClean.csv"
-
-# server on ... lab
-# root = "/data/home/masoumeh/Data/"
-# scsv_file_path = "/data/home/agora/data/rawData/fullColectionCSV/fullColectionCSV|2022-01-19|03:42:12.csv"
 
 
-# non_related_points = [8, 9, 12, 10, 13, 11, 24, 23, 22, 21, 14, 19, 20, 15, 16, 17, 18, 0, 1]
-dataset, train, test = create_dataset(path_csv=root+csv_file_path, path_txt=root+txt_file_path)
-
-# count the words in each file
-train_groups = train.groupby("name")
-total = sum([g.words.unique().shape[0] for n, g in train_groups])
-print("total gestures in train: ", total)
-
-test_groups = test.groupby("name")
-total = sum([g.words.unique().shape[0] for n, g in test_groups])
-print("total gestures in test: ", total)
-
-
-print("total (semantic) classes: ", dataset.SemanticType.unique().shape[0])
-print("total (word) labels: ", dataset.words.unique().shape[0])
 
 # print("train input shape:", train.name.unique().shape)
 # print("test input shape", test.name.unique().shape)

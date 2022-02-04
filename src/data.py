@@ -81,7 +81,7 @@ def create_data_for_nn(path):
     for n, group in groups:
         features = np.stack(group[["nx", "ny", "poi"]].values)
         X_data.append(features.ravel())
-        y_data.append(group.SemanticType.unique()[0])
+        y_data.append(group.classes.unique()[0])
     X_data = zero_pad(X_data)
     return X_data, y_data
 
@@ -212,15 +212,3 @@ if __name__ == '__main__':
     # path = "/home/masoumeh/Desktop/MasterThesis/Code/BodyGesturePatternDetection/docs/plots/"
     # plot_all_points_for_words(dataset, path=path)
     print("Done!")
-    X_data, y_data = create_data_for_nn(where_to_write+"dataset_small_small.csv")
-    print(len(X_data))
-    print(y_data.count('demarcative'))
-    print(y_data.count('deictic'))
-    print(y_data.count('sequential'))
-
-    X_train, X_test, y_train, y_test = split_train_test(X_data, y_data)
-    print(len(X_train))
-    print(len(X_test))
-    # print(y_test.count(0))
-    # print(y_test.count(1))
-    # print(y_test.count(2))

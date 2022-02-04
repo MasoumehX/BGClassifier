@@ -60,6 +60,25 @@ def plot_freq_power(first_freq, second_freq, title, path, filename, show=True, s
     plt.close()
 
 
+def plot_all_points_for_words(df, path):
+    "A helper fucntion to plot the trajectories points for all words"
+
+    # removing the points corresponding to the lower body
+    non_related_points = [8, 9, 12, 10, 13, 11, 24, 23, 22, 21, 14, 19, 20]
+    df = df[~df.point.isin(non_related_points)]
+    df["point"] = df["point"].astype(str)
+
+    # for all the words in the data
+    word_groups = df.groupby(by="words")
+    for wname, wgroup in word_groups:
+        fname = 0
+        groups = wgroup.groupby(by="name")
+        for name, group in groups:
+            plot_scatter(group, x="nx", y="ny", labels="point", path=path, filename=name + "_" + str(fname),
+                         directory=wname, title="Scatter plot of points for word " + wname)
+            fname += 1
+
+
 
 # def system(vect, t):
 #     x, y = vect

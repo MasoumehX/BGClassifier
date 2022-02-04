@@ -30,25 +30,6 @@ def print_data_stats(df_data):
     print(" ---- highest frequency: ", max(words_groups))
 
 
-def plot_all_points_for_words(df, path):
-    "A helper fucntion to plot the trajectories points for all words"
-
-    # removing the points corresponding to the lower body
-    non_related_points = [8, 9, 12, 10, 13, 11, 24, 23, 22, 21, 14, 19, 20]
-    df = df[~df.point.isin(non_related_points)]
-    df["point"] = df["point"].astype(str)
-
-    # for all the words in the data
-    word_groups = df.groupby(by="words")
-    for wname, wgroup in word_groups:
-        fname = 0
-        groups = wgroup.groupby(by="name")
-        for name, group in groups:
-            plot_scatter(group, x="nx", y="ny", labels="point", path=path, filename=name + "_" + str(fname),
-                         directory=wname, title="Scatter plot of points for word " + wname)
-            fname += 1
-
-
 def pre_process(data, drop_cols=None, drop_point=None, drop_pose=None):
     """ A helper function to clean the raw data"""
 
@@ -88,6 +69,21 @@ def pre_process(data, drop_cols=None, drop_point=None, drop_pose=None):
     data["poi"] = data["point"].astype(int)
     data = data[~data.time.isna()]
     return data
+
+
+def create_data_for_nn(path):
+    """ A helper function to create a zero padded features for the data"""
+    data = read_csv_file(path)
+    groups = data.groupby(by=["fid", "words"])
+
+    X_data = []
+    y_data = []
+    for n, group in groups:
+        features = np.stack(group[["nx", "ny", "poi"]].values)
+        X_data.append(features.ravel())
+        y_data.append(group.SemanticType.unique()[0])
+    X_data = zero_pad(X_data)
+    return X_data, y_data
 
 
 def create_dataset(path_csv, path_txt, drop_cols=None, drop_point=None, drop_pose=None):
@@ -160,8 +156,8 @@ if __name__ == '__main__':
     # txt_file_path = "/data/home/masoumeh/Data/classessem.txt"
     # csv_file_path = "/data/home/agora/data/rawData/fullColectionCSV/fullColectionCSV|2022-01-19|03:42:12.csv"
 
-    # non_related_points = [8, 9, 12, 10, 13, 11, 24, 23, 22, 21, 14, 19, 20, 15, 16, 17, 18, 0, 1]
-    dataset, train, test = create_dataset(path_csv=csv_file_path, path_txt=txt_file_path)
+    non_related_points = [8, 9, 12, 10, 13, 11, 24, 23, 22, 21, 14, 19, 20, 15, 16, 17, 18, 0, 1]
+    dataset, train, test = create_dataset(path_csv=csv_file_path, path_txt=txt_file_path, drop_point=non_related_points)
 
     # count the words in each file
     dataset_groups = dataset.groupby("name")
@@ -206,12 +202,25 @@ if __name__ == '__main__':
 
     # Writing the results in csv files
     where_to_write = "/home/masoumeh/Desktop/MasterThesis/Data/"
-    # write_csv_file(dataset, path=where_to_write+"dataset_small.csv")
-    # write_csv_file(train, path=where_to_write+"train_small.csv")
-    # write_csv_file(test, path=where_to_write+"test_small.csv")
+    # write_csv_file(dataset, path=where_to_write+"dataset_small_small.csv")
+    # write_csv_file(train, path=where_to_write+"train_small_small.csv")
+    # write_csv_file(test, path=where_to_write+"test_small_small.csv")
     #
     # reading the csv files
     # read_csv_file(where_to_write+"dataset_big.csv")
 
-    path = "/home/masoumeh/Desktop/MasterThesis/Code/BodyGesturePatternDetection/docs/plots/"
-    plot_all_points_for_words(dataset, path=path)
+    # path = "/home/masoumeh/Desktop/MasterThesis/Code/BodyGesturePatternDetection/docs/plots/"
+    # plot_all_points_for_words(dataset, path=path)
+    print("Done!")
+    X_data, y_data = create_data_for_nn(where_to_write+"dataset_small_small.csv")
+    print(len(X_data))
+    print(y_data.count('demarcative'))
+    print(y_data.count('deictic'))
+    print(y_data.count('sequential'))
+
+    X_train, X_test, y_train, y_test = split_train_test(X_data, y_data)
+    print(len(X_train))
+    print(len(X_test))
+    # print(y_test.count(0))
+    # print(y_test.count(1))
+    # print(y_test.count(2))

@@ -31,5 +31,4 @@ def compute_acc_acc5_f1_prec_rec(y_true, y_pred):
     print('precision macro: ', "%.2f" % (dic_model["precision_macro"] * 100))
     print('recall macro: ', "%.2f" % (dic_model['recall_macro'] * 100))
     print('F1 macro: ', "%.2f" % (dic_model['f1-macro'] * 100))
-    result = pd.DataFrame(dic_model, index=[0])
-    return result
+    return dic_model

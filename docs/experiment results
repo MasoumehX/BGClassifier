@@ -15,17 +15,26 @@ total gestures per (semantic) class:
 
 
 Big Data:
+Name:
+Path:
 ---------------------------------------------------------------------
-The shape:  (38521112, 16)
-total gestures:  988
-total gestures in train: 780
-total gestures in test: 208
-total (semantic) classes:  3
-total (word) labels:  24
-total gestures per (semantic) class:
- --- total gestures per `demarcative` class: 516
- --- total gestures per `deictic` class: 213
- --- total gestures per `sequential` class: 259
+Original Shape: (42854970, 9)
+
+Applied general pre-process():
+    Shape:  (20348336, 10)
+Applied merge with Semantic Classes:
+    Shape:  (19281380, 13)
+
+
+    total gestures:  988
+    total gestures in train: 780
+    total gestures in test: 208
+    total (semantic) classes:  3
+    total (word) labels:  24
+    total gestures per (semantic) class:
+     --- total gestures per `demarcative` class: 516
+     --- total gestures per `deictic` class: 213
+     --- total gestures per `sequential` class: 259
 
 
 

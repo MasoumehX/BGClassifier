@@ -54,24 +54,25 @@ from torch.nn import BCEWithLogitsLoss, Linear, Module, ReLU, Tanh, NLLLoss
 # ----------------------------------------------------
 
 #
-# def baseline_main(X_train, y_train, X_test, y_test, model="random forest"):
-#
-#     cues_col = ["x", "y", "time", "poi"]
-#     X_train = np.stack(X_train[cues_col].values)
-#     y_train = y_train["SemanticType"].values
-#
-#     X_test = np.stack(X_test[cues_col].values)
-#     y_test = y_test["SemanticType"].values
-#
-#     start = time.time()
-#     clf = BaseLine(model="random forest")
-#     end = time.time()
-#     print('total Time: {}'.format(end - start))
-#     predictions = clf.predict(X_test)
-#     print("Predicted Classes: ", list(set(predictions)))
-#
-#     print(" ========== RESULTS ===========")
-#     compute_acc_acc5_f1_prec_rec(y_true=y_test, y_pred=predictions)
+def baseline_main(X_train, y_train, X_test, y_test, model="random forest"):
+
+    cues_col = ["x", "y", "time", "poi"]
+    X_train = np.stack(X_train[cues_col].values)
+    y_train = y_train["SemanticType"].values
+
+    X_test = np.stack(X_test[cues_col].values)
+    y_test = y_test["SemanticType"].values
+
+    start = time.time()
+    clf = BaseLine(model="random forest")
+    clf = clf(X_train, y_train)
+    end = time.time()
+    print('total Time: {}'.format(end - start))
+    predictions = clf.predict(X_test)
+    print("Predicted Classes: ", list(set(predictions)))
+
+    print(" ========== RESULTS ===========")
+    compute_acc_acc5_f1_prec_rec(y_true=y_test, y_pred=predictions)
 #
 #
 # def nn_main(X_train, y_train, X_test, y_test, model="FFN"):

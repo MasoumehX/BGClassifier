@@ -1,7 +1,6 @@
 "Data preparation and pre-processing scripts"
 
 from utils import *
-from plot import plot_scatter
 
 
 def print_data_stats(df_data):
@@ -30,69 +29,74 @@ def print_data_stats(df_data):
     print(" ---- highest frequency: ", max(words_groups))
 
 
-def pre_process(data, drop_cols=None, drop_point=None, drop_pose=None):
+def general_pre_process(data, drop_cols=None, keep_point=None, keep_typePoint=None, keep_people=None):
     """ A helper function to clean the raw data"""
-
-    # rename columns
-    if drop_pose is not None:
-        data = data[~data.typePoint.isin(drop_pose)]
-
-    # Omit unrelated points (Head, lower body, center)
-    if drop_point is not None:
-        data = data[~data.point.isin(drop_point)]
-
-    # Drop unrelated columns
+    # keep the pose (all poses)
+    if keep_typePoint is not None:
+        data = data[data.typePoint.isin(keep_typePoint)]
+    # keep these points (hand gestures)
+    if keep_point is not None:
+        data = data[data.point.isin(keep_point)]
+    # Drop unrelated columns (people, name, ...)
     if drop_cols is not None:
         data = data.drop(drop_cols, axis=1)
-
+    # omit some people
+    if keep_people is not None:
+        data = data[data.people.isin(keep_people)]
     # Omit null or empty values
-    data = data[~((data.nx.isna()) | (data.ny.isna())) | (data.point.isna()) | (data.name.isna()) | (data.frame.isna())
-                | (data.SemanticType.isna()) | (data.words.isna())]
-
+    data = data[~((data.x.isna()) | (data.y.isna()) | (data.point.isna()) | (data.name.isna()) | (data.frame.isna()) | (data.words.isna()))]
     # drop duplicated values
     data = data.drop_duplicates()
-
-    # filter words less than frequency 5
-    # groups = data.groupby(['words'])
-    # data = groups.filter(lambda x: x.file.unique().shape[0] >= 5)
-
-    # create numerical columns
-    data = numerical_label(data, "words", "label")
-    data = numerical_label(data, "SemanticType", "classes")
-    data = numerical_label(data, "name", "fid")
-
     # normalize the frame and get the time
     # TODO: I am not sure this convert frames to time!
     data["time"] = list(data.groupby("name").frame.apply(normalize))
-
-    # convert the columns to int
-    data["poi"] = data["point"].astype(int)
     data = data[~data.time.isna()]
     return data
 
 
-def create_data_for_nn(path):
-    """ A helper function to create a zero padded features for the data"""
-    data = read_csv_file(path)
-    groups = data.groupby(by=["fid", "words"])
+def special_pre_processing(df_data):
+    """
+        This script applies after merging the semantic class and the data.
+        Look at the words that did not have a semantic class. Some of them
+        may have a mis spelling.
+    """
+    df_data["words"] = df_data["words"].str.replace("subsequntly", "subsequently")
+    df_data["words"] = df_data["words"].str.replace("ealier_than", "earlier_than")
+    df_data["words"] = df_data["words"].str.replace("durtng_the_presidential", "during_the_presidential")
+    df_data["words"] = df_data["words"].str.replace("during_her_entire", "during_the_entire")
+    df_data["words"] = df_data["words"].str.replace("months_Ahead_of", "months_ahead_of")
+    df_data["ww"] = df_data.words.apply(lambda x: 'distant_past' if x == 'distant_past_(1)' else x)
+    df_data["words"] = df_data.ww
+    return df_data
 
+
+def create_data_for_nn(data, flat=False, with_zero_pad=False):
+    """ A helper function to create a zero padded features for the data"""
+    groups = data.groupby(by=["fid", "words"])
     X_data = []
     y_data = []
     for n, group in groups:
-        features = np.stack(group[["nx", "ny", "poi"]].values)
-        X_data.append(features.ravel())
-        y_data.append(group.classes.unique()[0])
-    X_data = zero_pad(X_data)
+        features = np.stack(group[["x", "y", "poi"]].values)
+        if flat:
+            X_data.append(features.ravel())
+        else:
+            X_data.append(features)
+        className = group.classes.unique()
+        if len(className) > 1:
+            raise ValueError("A word can not have more than one class!")
+        y_data.append(className[0])
+    if with_zero_pad:
+        X_data = zero_pad(X_data)
     return X_data, y_data
 
 
-def create_dataset(path_csv, path_txt, drop_cols=None, drop_point=None, drop_pose=None):
+def create_data_sets(path_csv, path_txt, drop_cols=None, keep_point=None, keep_typePoint=None, keep_people=None):
 
-    if drop_point is None:
+    if keep_point is None:
         drop_point = []
     if drop_cols is None:
         drop_cols = []
-    if drop_pose is None:
+    if keep_typePoint is None:
         drop_pose = []
     if not os.path.exists(path_csv):
         raise FileNotFoundError("File does not exist!")
@@ -104,47 +108,60 @@ def create_dataset(path_csv, path_txt, drop_cols=None, drop_point=None, drop_pos
     if path_txt.split(".")[-1] != "txt":
         raise ValueError("The file is not a .xlsx file! Try another function!")
 
-    # reading the two files
-    df_data = read_csv_file(path_csv)
-    print(df_data.typePoint.unique())
-    df_semantic_classes = convert_txtfile_to_df(path_txt, separator="\t")
+    # reading the raw data
+    raw_data = read_csv_file(path_csv)
+
+    # apply the general pre-processing
+    dff_clean = general_pre_process(raw_data, drop_cols=drop_cols, keep_point=keep_points, keep_typePoint=keep_typepoint, keep_people=keep_people)
+
+    # apply special pre-processing
+    # dff_clean = special_pre_processing(dff_clean)
+
+    # read and merge the semantic classes for all words
+    df_semantic_classes = convert_txt_to_df(path_txt, separator="\t")
     print("-" * 60)
     print("Words that do not have semantic class: ")
-    print(df_data[~df_data.words.isin(df_semantic_classes.Expression)].words.unique())
-    data = df_data.merge(df_semantic_classes, left_on="words", right_on="Expression", how="inner")
+    print(dff_clean[~dff_clean.words.isin(df_semantic_classes.Expression)].words.unique())
+    data = dff_clean.merge(df_semantic_classes, left_on="words", right_on="Expression", how="inner")
     print("-" * 60)
     print("The new data base: ", data.shape)
     print("Columns to drop: ", drop_cols)
-    print("Points to drop: ", drop_point)
-    print("Poses to drop: ", drop_pose)
+    print("Points to keep: ", keep_point)
+    print("Poses to keep: ", keep_typepoint)
+    print("people to keep: ", keep_people)
     print("-" * 60)
-    dff = pre_process(data, drop_cols=drop_cols, drop_point=drop_point, drop_pose=drop_pose)
-    # Split the data to test, train and maybe val
 
-    groups = dff.groupby(['words'])
+    # create numerical columns
+    data = numerical_label(data, "words", "label")
+    data = numerical_label(data, "SemanticType", "classes")
+    data = numerical_label(data, "name", "fid")
+    data["poi"] = data["point"].astype(int)
+
+    # Split the data to test, train and maybe val
+    groups = data.groupby(['words'])
     test_ = []
     # val_ = []
     train_ = []
     for name, group in groups:
         files = group.name.unique()
         len_files = len(files)
-        percentage_80 = int((len_files * 80)/100)
-        # percentage_20 = int((len_files * 15)/100)
-        # print(len_files, percentage_80)
-        train_.extend(files[:percentage_80])
-        # val_.extend(files[percentage_70:percentage_70+percentage_15])
-        test_.extend(files[percentage_80:])
-
-    df_train = dff[dff.name.isin(train_)]
+        if len_files >= 3:
+            percentage_80 = int((len_files * 80)/100)
+            # percentage_20 = int((len_files * 15)/100)
+            # print(len_files, percentage_80)
+            train_.extend(files[:percentage_80])
+            # val_.extend(files[percentage_70:percentage_70+percentage_15])
+            test_.extend(files[percentage_80:])
+    df_train = data[data.name.isin(train_)]
     # df_val = df[df.name.isin(val_)]
-    df_test = dff[dff.name.isin(test_)]
+    df_test = data[data.name.isin(test_)]
 
     # sorting based on the name (file name)
-    dff = dff.sort_values(by=["fid", "time"])
-    df_train = df_train.sort_values(by=["fid", "time"])
-    df_test = df_test.sort_values(by=["fid", "time"])
+    data_sorted = data.sort_values(by=["fid", "time"])
+    df_train_sorted = df_train.sort_values(by=["fid", "time"])
+    df_test_sorted = df_test.sort_values(by=["fid", "time"])
 
-    return dff, df_train, df_test
+    return data_sorted, df_train_sorted, df_test_sorted
 
 
 if __name__ == '__main__':
@@ -156,29 +173,68 @@ if __name__ == '__main__':
     # txt_file_path = "/data/home/masoumeh/Data/classessem.txt"
     # csv_file_path = "/data/home/agora/data/rawData/fullColectionCSV/fullColectionCSV|2022-01-19|03:42:12.csv"
 
-    non_related_points = [8, 9, 12, 10, 13, 11, 24, 23, 22, 21, 14, 19, 20, 15, 16, 17, 18, 0, 1]
-    dataset, train, test = create_dataset(path_csv=csv_file_path, path_txt=txt_file_path, drop_point=non_related_points)
+    keep_points = [2, 3, 4, 5, 6, 7]
+    keep_typepoint = ['pose_keypoints']
+    keep_people = [1]
+    drop_cols = None
+    dataset, train, test = create_data_sets(path_csv=csv_file_path, path_txt=txt_file_path, drop_cols=drop_cols,
+                                            keep_point=keep_points, keep_typePoint=keep_typepoint,
+                                            keep_people=keep_people)
 
+    print(dataset.words.unique())
     # count the words in each file
     dataset_groups = dataset.groupby("name")
     total_gestures = sum([g.words.unique().shape[0] for n, g in dataset_groups])
     print("total gestures in dataset: ", total_gestures)
-
     # count the words in each file
     train_groups = train.groupby("name")
     train_total = sum([g.words.unique().shape[0] for n, g in train_groups])
     print("total gestures in train: ", train_total)
-
     test_groups = test.groupby("name")
     test_total = sum([g.words.unique().shape[0] for n, g in test_groups])
     print("total gestures in test: ", test_total)
-
     print("total (semantic) classes: ", dataset.SemanticType.unique().shape[0])
     print("total (word) labels: ", dataset.words.unique().shape[0])
 
     dataset_groups = dataset.groupby(by=["SemanticType", "name"])
     gesture_groups={"demarcative":0, "deictic":0, "sequential":0}
     for n, g in dataset_groups:
+        if n[0] == "demarcative":
+            gesture_groups["demarcative"] += g.words.unique().shape[0]
+        if n[0] == "deictic":
+            gesture_groups["deictic"] += g.words.unique().shape[0]
+        if n[0] == "sequential":
+            gesture_groups["sequential"] += g.words.unique().shape[0]
+
+    print("total gestures per (semantic) class:")
+    print(" --- total gestures per `demarcative` class:", gesture_groups["demarcative"])
+    print(" --- total gestures per `deictic` class:", gesture_groups["deictic"])
+    print(" --- total gestures per `sequential` class:", gesture_groups["sequential"])
+
+
+    # ------------------------------------ Train -------------------------------------------------#
+
+    gesture_groups = {"demarcative":0, "deictic":0, "sequential":0}
+    train_groups = train.groupby(by=["SemanticType", "name"])
+    for n, g in train_groups:
+        if n[0] == "demarcative":
+            gesture_groups["demarcative"] += g.words.unique().shape[0]
+        if n[0] == "deictic":
+            gesture_groups["deictic"] += g.words.unique().shape[0]
+        if n[0] == "sequential":
+            gesture_groups["sequential"] += g.words.unique().shape[0]
+
+    print("total gestures per (semantic) class:")
+    print(" --- total gestures per `demarcative` class:", gesture_groups["demarcative"])
+    print(" --- total gestures per `deictic` class:", gesture_groups["deictic"])
+    print(" --- total gestures per `sequential` class:", gesture_groups["sequential"])
+
+
+    # ------------------------------------ Test -------------------------------------------------#
+
+    gesture_groups = {"demarcative":0, "deictic":0, "sequential":0}
+    test_groups = test.groupby(by=["SemanticType", "name"])
+    for n, g in test_groups:
         if n[0] == "demarcative":
             gesture_groups["demarcative"] += g.words.unique().shape[0]
         if n[0] == "deictic":
@@ -201,10 +257,13 @@ if __name__ == '__main__':
     # metadata["n_rows"] = [dataset.shape[0], train[0]],
 
     # Writing the results in csv files
-    where_to_write = "/home/masoumeh/Desktop/MasterThesis/Data/"
-    # write_csv_file(dataset, path=where_to_write+"dataset_small_small.csv")
-    # write_csv_file(train, path=where_to_write+"train_small_small.csv")
-    # write_csv_file(test, path=where_to_write+"test_small_small.csv")
+    # where_to_write = "/home/masoumeh/Desktop/MasterThesis/Data/"
+
+    # server
+    where_to_write = "/data/home/masoumeh/Data/"
+    write_csv_file(dataset, path=where_to_write+"dataset_big_clean.csv")
+    write_csv_file(train, path=where_to_write+"train_big_clean.csv")
+    write_csv_file(test, path=where_to_write+"test_big_clean.csv")
     #
     # reading the csv files
     # read_csv_file(where_to_write+"dataset_big.csv")

@@ -38,7 +38,6 @@ def read_txt_file(path):
         A helper function to read a txt file. If does not read the entire file.
         :param path: a full path to the file.
         :return: Text Object to be read by read(), readline(), readlines()
-
     """
     if not os.path.exists(path):
         raise FileNotFoundError("File does not exist!")
@@ -48,13 +47,12 @@ def read_txt_file(path):
     return text
 
 
-def convert_txtfile_to_df(path, separator=" "):
+def convert_txt_to_df(path, separator=" "):
     """
         A helper function to read a txt file and convert it to a pandas.Dataframe. The first line should be the header.
         :param path: a full path to the file.
         :param separator: A separator character. Usually is " " or "\t".
         :return: pandas.DataFrame
-
     """
     text = read_txt_file(path)
     header = next(text)

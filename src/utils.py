@@ -93,11 +93,11 @@ def get_freq_power(data, freq_col):
     return keys, values
 
 
-def zero_pad(a, max_vec=None):
+def padding_vector(a, max_vec=None):
     """
     A function to zero padding
     Parameter:
-        data : a list of all features
+        a : a list of all features
     Returns:
         numpy array
     """
@@ -105,17 +105,32 @@ def zero_pad(a, max_vec=None):
     df["features"] = a
     # flatten
     df["flatten"] = df["features"].apply(np.ravel)
-    df['len'] = df['flatten'].apply(len)
     if max_vec is None:
+        df['len'] = df['flatten'].apply(len)
         max_vecdim = df['len'].max()
+        print("max len: ",max_vecdim)
     else:
         max_vecdim=max_vec
-    df = df.apply(lambda row: np.pad(row['flatten'], pad_width=(0, max_vecdim - row['len']), mode='constant'),
-                              axis=1)
-
+        print("max len: ",max_vecdim)
+    df = df.apply(lambda row: np.pad(row['flatten'], pad_width=(0, max_vecdim - row['len']), constant_values=-10, mode='constant'),axis=1)
     return np.stack(df.values)
+
+
+def padding_matrix(a, max_seq_len=None, pad_value=-10, feature_dim=4):
+    """
+    A helper function for padding an nd-array
+    Parameter:
+        data : a list of all features
+    Returns:
+        numpy array (N x max_vec x M) : N = len(a), max_vec = maximum length on a, M = a[0].shape[1]
+    """
+    Xpad = np.full((len(a), max_seq_len, feature_dim), fill_value=pad_value)
+    for s, x in enumerate(a):
+        seq_len = x.shape[0]
+        Xpad[s, 0:seq_len, :] = x
+    return Xpad
 
 
 def split_train_test(X, y, test_size=0.2, shuffle=True):
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, shuffle=shuffle, random_state=42)
-    return X_train, X_test, y_train, y_test
+    return X_train, y_train, X_test, y_test

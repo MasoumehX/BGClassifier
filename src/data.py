@@ -70,34 +70,16 @@ def special_pre_processing(df_data):
     return df_data
 
 
-def create_data_for_nn(data, flat=False, with_zero_pad=False):
-    """ A helper function to create a zero padded features for the data"""
-    groups = data.groupby(by=["fid", "words"])
-    X_data = []
-    y_data = []
-    for n, group in groups:
-        features = np.stack(group[["x", "y", "poi"]].values)
-        if flat:
-            X_data.append(features.ravel())
-        else:
-            X_data.append(features)
-        className = group.classes.unique()
-        if len(className) > 1:
-            raise ValueError("A word can not have more than one class!")
-        y_data.append(className[0])
-    if with_zero_pad:
-        X_data = zero_pad(X_data)
-    return X_data, y_data
-
-
-def create_data_sets(path_csv, path_txt, drop_cols=None, keep_point=None, keep_typePoint=None, keep_people=None):
+def create_df_dataset_train_test(path_csv, path_txt, drop_cols=None, keep_point=None, keep_typePoint=None, keep_people=None):
 
     if keep_point is None:
-        drop_point = []
+        keep_point = []
     if drop_cols is None:
         drop_cols = []
     if keep_typePoint is None:
-        drop_pose = []
+        keep_typePoint = []
+    if keep_people is None:
+        keep_people = []
     if not os.path.exists(path_csv):
         raise FileNotFoundError("File does not exist!")
     if path_csv.split(".")[-1] != "csv":
@@ -112,7 +94,7 @@ def create_data_sets(path_csv, path_txt, drop_cols=None, keep_point=None, keep_t
     raw_data = read_csv_file(path_csv)
 
     # apply the general pre-processing
-    dff_clean = general_pre_process(raw_data, drop_cols=drop_cols, keep_point=keep_points, keep_typePoint=keep_typepoint, keep_people=keep_people)
+    dff_clean = general_pre_process(raw_data, drop_cols=drop_cols, keep_point=keep_point, keep_typePoint=keep_typePoint, keep_people=keep_people)
 
     # apply special pre-processing
     # dff_clean = special_pre_processing(dff_clean)
@@ -127,7 +109,7 @@ def create_data_sets(path_csv, path_txt, drop_cols=None, keep_point=None, keep_t
     print("The new data base: ", data.shape)
     print("Columns to drop: ", drop_cols)
     print("Points to keep: ", keep_point)
-    print("Poses to keep: ", keep_typepoint)
+    print("Poses to keep: ", keep_typePoint)
     print("people to keep: ", keep_people)
     print("-" * 60)
 
@@ -164,41 +146,36 @@ def create_data_sets(path_csv, path_txt, drop_cols=None, keep_point=None, keep_t
     return data_sorted, df_train_sorted, df_test_sorted
 
 
-if __name__ == '__main__':
-    # local
-    csv_file_path = "/home/masoumeh/Desktop/MasterThesis/Data/fullVideosClean.csv"
-    txt_file_path = "/home/masoumeh/Desktop/MasterThesis/Data/classessem.txt"
+def create_data_for_training(data, with_zero_pad=False, model="base"):
+    """ A helper function to create data for neural networks model"""
+    groups = data.groupby(by=["fid", "words"])
+    X_data = []
+    y_data = []
+    features_len = []
+    for name, group in groups:
+        features = np.stack(group[["x", "y", "poi", "frame"]].values)
+        features_len.append(features.shape[0])
+        X_data.append(features)
+        class_name = group.classes.unique()
+        if len(class_name) > 1:
+            raise ValueError("A word can not have more than one class!")
+        y_data.append(class_name[0])
 
-    # server on ... lab
-    # txt_file_path = "/data/home/masoumeh/Data/classessem.txt"
-    # csv_file_path = "/data/home/agora/data/rawData/fullColectionCSV/fullColectionCSV|2022-01-19|03:42:12.csv"
+    # Applying zero pad in two different ways (as a vector M x 1 x N or as a matrix M x D x F)
+    if with_zero_pad and model == "nn":
+        return padding_matrix(X_data, max_seq_len=max(features_len)), np.array(y_data)
+    elif with_zero_pad and model == "base":
+        return padding_vector(X_data), np.array(y_data)
+    else:
+        return X_data, np.array(y_data)
 
-    keep_points = [2, 3, 4, 5, 6, 7]
-    keep_typepoint = ['pose_keypoints']
-    keep_people = [1]
-    drop_cols = None
-    dataset, train, test = create_data_sets(path_csv=csv_file_path, path_txt=txt_file_path, drop_cols=drop_cols,
-                                            keep_point=keep_points, keep_typePoint=keep_typepoint,
-                                            keep_people=keep_people)
 
-    print(dataset.words.unique())
-    # count the words in each file
-    dataset_groups = dataset.groupby("name")
-    total_gestures = sum([g.words.unique().shape[0] for n, g in dataset_groups])
-    print("total gestures in dataset: ", total_gestures)
-    # count the words in each file
-    train_groups = train.groupby("name")
-    train_total = sum([g.words.unique().shape[0] for n, g in train_groups])
-    print("total gestures in train: ", train_total)
-    test_groups = test.groupby("name")
-    test_total = sum([g.words.unique().shape[0] for n, g in test_groups])
-    print("total gestures in test: ", test_total)
-    print("total (semantic) classes: ", dataset.SemanticType.unique().shape[0])
-    print("total (word) labels: ", dataset.words.unique().shape[0])
+def print_dataset_info(dataset, train, test):
 
-    dataset_groups = dataset.groupby(by=["SemanticType", "name"])
-    gesture_groups={"demarcative":0, "deictic":0, "sequential":0}
-    for n, g in dataset_groups:
+    # ------------------------------------ dataset -------------------------------------------------#
+    gesture_groups = {"demarcative": 0, "deictic": 0, "sequential": 0}
+    train_groups = train.groupby(by=["SemanticType", "name"])
+    for n, g in train_groups:
         if n[0] == "demarcative":
             gesture_groups["demarcative"] += g.words.unique().shape[0]
         if n[0] == "deictic":
@@ -206,15 +183,16 @@ if __name__ == '__main__':
         if n[0] == "sequential":
             gesture_groups["sequential"] += g.words.unique().shape[0]
 
+    print("total words: ", dataset.words.unique().shape[0])
     print("total gestures per (semantic) class:")
     print(" --- total gestures per `demarcative` class:", gesture_groups["demarcative"])
     print(" --- total gestures per `deictic` class:", gesture_groups["deictic"])
     print(" --- total gestures per `sequential` class:", gesture_groups["sequential"])
-
+    print("total gestures: ", sum(gesture_groups.values()))
 
     # ------------------------------------ Train -------------------------------------------------#
 
-    gesture_groups = {"demarcative":0, "deictic":0, "sequential":0}
+    gesture_groups = {"demarcative": 0, "deictic": 0, "sequential": 0}
     train_groups = train.groupby(by=["SemanticType", "name"])
     for n, g in train_groups:
         if n[0] == "demarcative":
@@ -228,11 +206,11 @@ if __name__ == '__main__':
     print(" --- total gestures per `demarcative` class:", gesture_groups["demarcative"])
     print(" --- total gestures per `deictic` class:", gesture_groups["deictic"])
     print(" --- total gestures per `sequential` class:", gesture_groups["sequential"])
-
+    print("total gestures: ", sum(gesture_groups.values()))
 
     # ------------------------------------ Test -------------------------------------------------#
 
-    gesture_groups = {"demarcative":0, "deictic":0, "sequential":0}
+    gesture_groups = {"demarcative": 0, "deictic": 0, "sequential": 0}
     test_groups = test.groupby(by=["SemanticType", "name"])
     for n, g in test_groups:
         if n[0] == "demarcative":
@@ -246,28 +224,4 @@ if __name__ == '__main__':
     print(" --- total gestures per `demarcative` class:", gesture_groups["demarcative"])
     print(" --- total gestures per `deictic` class:", gesture_groups["deictic"])
     print(" --- total gestures per `sequential` class:", gesture_groups["sequential"])
-
-    # TODO complete the metadata
-    # metadata = pd.DataFrame(columns={"name", "n_rows", "n_gestures", "n_semantic_classes", "n_word_token",
-    #                                  "n_word_type", "n_gesture_per_semantic", "n_gesture_per_word"})
-    # db_name = ["small", "train_small", "test_small"]
-    # n_rows = [dataset.shape[0], train.shape[0], test.shape[0]]
-    # n_gestures = [total_gestures, train_total, test_total]
-    #
-    # metadata["n_rows"] = [dataset.shape[0], train[0]],
-
-    # Writing the results in csv files
-    # where_to_write = "/home/masoumeh/Desktop/MasterThesis/Data/"
-
-    # server
-    where_to_write = "/data/home/masoumeh/Data/"
-    write_csv_file(dataset, path=where_to_write+"dataset_big_clean.csv")
-    write_csv_file(train, path=where_to_write+"train_big_clean.csv")
-    write_csv_file(test, path=where_to_write+"test_big_clean.csv")
-    #
-    # reading the csv files
-    # read_csv_file(where_to_write+"dataset_big.csv")
-
-    # path = "/home/masoumeh/Desktop/MasterThesis/Code/BodyGesturePatternDetection/docs/plots/"
-    # plot_all_points_for_words(dataset, path=path)
-    print("Done!")
+    print("total gestures: ", sum(gesture_groups.values()))

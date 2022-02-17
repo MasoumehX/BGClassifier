@@ -124,13 +124,13 @@ def padding_matrix(a, max_seq_len=None, pad_value=-10, feature_dim=4):
     Returns:
         numpy array (N x max_vec x M) : N = len(a), max_vec = maximum length on a, M = a[0].shape[1]
     """
-    Xpad = np.full((len(a), max_seq_len, feature_dim), fill_value=pad_value)
+    Xpad = np.full((len(a), max_seq_len, feature_dim), fill_value=pad_value, dtype=float)
     for s, x in enumerate(a):
         seq_len = x.shape[0]
         Xpad[s, 0:seq_len, :] = x
     return Xpad
 
 
-def split_train_test(X, y, test_size=0.2, shuffle=True):
+def split_train_test(X, y, test_size=0.3, shuffle=True):
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, shuffle=shuffle, random_state=42)
     return X_train, y_train, X_test, y_test

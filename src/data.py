@@ -45,6 +45,8 @@ def general_pre_process(data, drop_cols=None, keep_point=None, keep_typePoint=No
         data = data[data.people.isin(keep_people)]
     # Omit null or empty values
     data = data[~((data.x.isna()) | (data.y.isna()) | (data.point.isna()) | (data.name.isna()) | (data.frame.isna()) | (data.words.isna()))]
+    # Omit zero values for x or y
+    data = data[~((data.x == 0.0) | (data.y == 0.0))]
     # drop duplicated values
     data = data.drop_duplicates()
     # normalize the frame and get the time
@@ -146,14 +148,16 @@ def create_df_dataset_train_test(path_csv, path_txt, drop_cols=None, keep_point=
     return data_sorted, df_train_sorted, df_test_sorted
 
 
-def create_data_for_training(data, with_zero_pad=False, model="base"):
+def create_data_for_training(data, with_pad=False, features=None, model="base"):
     """ A helper function to create data for neural networks model"""
     groups = data.groupby(by=["fid", "words"])
     X_data = []
     y_data = []
     features_len = []
+    if features is None:
+        features = []
     for name, group in groups:
-        features = np.stack(group[["x", "y", "poi", "frame"]].values)
+        features = np.stack(group[features].values)
         features_len.append(features.shape[0])
         X_data.append(features)
         class_name = group.classes.unique()
@@ -162,9 +166,9 @@ def create_data_for_training(data, with_zero_pad=False, model="base"):
         y_data.append(class_name[0])
 
     # Applying zero pad in two different ways (as a vector M x 1 x N or as a matrix M x D x F)
-    if with_zero_pad and model == "nn":
+    if with_pad and model == "nn":
         return padding_matrix(X_data, max_seq_len=max(features_len)), np.array(y_data)
-    elif with_zero_pad and model == "base":
+    elif with_pad and model == "base":
         return padding_vector(X_data), np.array(y_data)
     else:
         return X_data, np.array(y_data)

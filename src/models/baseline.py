@@ -35,7 +35,7 @@ if __name__ == '__main__':
     # On Server
     path = "/data/home/masoumeh/Data/"
     df_data = read_csv_file(path+"dataset_big_clean.csv")
-    X_data, y_data = create_data_for_training(df_data, with_zero_pad=True, model="baseline")
+    X_data, y_data = create_data_for_training(df_data, with_pad=True, model="baseline")
     X_train, ytrain, X_test, ytest = split_train_test(X_data, y_data)
     run(X_train, ytrain, X_test, ytest, base_model="svm")
     run(X_train, ytrain, X_test, ytest, base_model="random forest")

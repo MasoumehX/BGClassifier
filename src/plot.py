@@ -79,28 +79,17 @@ def plot_all_points_for_words(df, path):
             fname += 1
 
 
-
-# def system(vect, t):
-#     x, y = vect
-#     return [x - y - x * (x ** 2 + 5 * y ** 2), x + y - y * (x ** 2 + y ** 2)]
-#
-#
-# if __name__ == '__main__':
-#
-#     vect0 = [(-2 + 4 * np.random.random(), -2 + 4 * np.random.random()) for i in range(5)]
-#     t = np.linspace(0, 100, 1000)
-#
-#     color = ['red', 'green', 'blue', 'yellow', 'magenta']
-#
-#     plot = plt.figure()
-#
-#     for i, v in enumerate(vect0):
-#         sol = odeint(system, v, t)
-#         plt.quiver(sol[:-1, 0], sol[:-1, 1], sol[1:, 0] - sol[:-1, 0], sol[1:, 1] - sol[:-1, 1], scale_units='xy',
-#                    angles='xy', scale=1, color=color[i])
-#
-#     plt.show()
-
+def plot_model_loss(out):
+    metric = "accuracy"
+    plt.figure()
+    plt.plot(out.history[metric])
+    plt.plot(out.history["val_" + metric])
+    plt.title("model " + metric)
+    plt.ylabel(metric, fontsize="large")
+    plt.xlabel("epoch", fontsize="large")
+    plt.legend(["train", "val"], loc="best")
+    plt.show()
+    plt.close()
 
 
 

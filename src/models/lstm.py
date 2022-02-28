@@ -26,8 +26,7 @@ def train_model(model, x_train, y_train, lr=0.01, epochs=500, batch_size=32):
     return model.fit(x_train, y_train, epochs=epochs, batch_size=batch_size, callbacks=callbacks, validation_split=0.1, verbose=1)
 
 
-def evaluate_model(x_test, y_test):
-    model = keras.models.load_model("best_model.h5")
+def evaluate_model(model, x_test, y_test):
     loss, accuracy, f1_score, precision, recall = model.evaluate(x_test, y_test, verbose=0)
     print("Test loss", loss)
     print("Test accuracy", accuracy)
@@ -36,23 +35,45 @@ def evaluate_model(x_test, y_test):
     print("Test f1_score", f1_score)
 
 
-if __name__ == '__main__':
-
+def load_data():
     # On Server
     path = "/data/home/masoumeh/Data/"
-    df_data = read_csv_file(path+"dataset_big_clean.csv")
-    X_data, y_data = create_data_for_training(df_data, with_pad=True, model="nn")
-    X_train, y_train, X_test, y_test = split_train_test(X_data, y_data, shuffle=True)
-    ytrain = keras.utils.to_categorical(y_train)
-    ytest = keras.utils.to_categorical(y_test)
+    data_train = read_csv_file(path + "train.csv")
+    data_test = read_csv_file(path + "test.csv")
 
-    # features = ["x", "y", "poi", "frame"]
-    max_seq_len = X_data[0].shape[0]  # 30??
-    feature_dim = X_data[0].shape[1]  # 4
-    n_classes = len(np.unique(y_train))  # 3
-    lstm_model = make_model(lstm_unit=300, max_seq_len=max_seq_len, dimension=feature_dim, drop_out=0.1, lr=0.01,
+    #
+    # print("total gestures per (semantic) class for Train:")
+    # print(" --- total gestures per `demarcative` class:", y_train.tolist().count(2))
+    # print(" --- total gestures per `deictic` class:", y_train.tolist().count(0))
+    # print(" --- total gestures per `sequential` class:", y_train.tolist().count(1))
+    # print("total gestures in train: ", y_train.shape[0])
+    #
+    # print('-'*50)
+    #
+    # print("total gestures per (semantic) class for Test:")
+    # print(" --- total gestures per `demarcative` class:", y_test.tolist().count(2))
+    # print(" --- total gestures per `deictic` class:", y_test.tolist().count(0))
+    # print(" --- total gestures per `sequential` class:", y_test.tolist().count(1))
+    # print("total gestures in train: ", y_test.shape[0])
+
+    return data_train["features"], data_train["label"], data_test["features"], data_test["label"]
+
+
+def run():
+    xtrain, ytrain, xtest, ytest = load_data()
+
+    ytrain = keras.utils.to_categorical(ytrain)
+    ytest = keras.utils.to_categorical(ytest)
+
+    feature_dim = xtrain[0].shape[1]
+    max_seq_len = xtrain[0].shape[0]
+    n_classes = ytrain.unique().shape[0]
+
+    lstm_model = make_model(lstm_unit=300, max_seq_len=max_seq_len, dimension=feature_dim, drop_out=0.1,
                             dense=200, n_out=n_classes, special_value=-10, act='relu')
-    output = train_model(lstm_model, X_train, ytrain, epochs=300, batch_size=64)
+    train_model(lstm_model, xtrain, ytrain, epochs=300, batch_size=64, lr=0.002)
 
     # evaluate the model on test data
-    evaluate_model(X_test, ytest)
+    evaluate_model(lstm_model, xtest, ytest)
+    make_model()
+

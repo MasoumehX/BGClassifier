@@ -45,16 +45,15 @@ def plot_line(x, y, filename, title, path, save, show):
     plt.close()
 
 
-def plot_freq_power(first_freq, second_freq, title, path, filename, show=True, save=False):
+def plot_power_law(first_freq, second_freq, title, path, filename, show=True, save=False):
     """A helper function to plot the frequency power (Zipf law)"""
     fig, ax = plt.subplots()
-    plt.plot(first_freq, second_freq, marker='*', fillstyle='none', linestyle='none', color='m')
-    plt.ylabel("Frequency")
-    plt.xlabel("Tokens")
-    plt.xticks(rotation=35)
+    plt.loglog(first_freq, second_freq, marker='*', fillstyle='none', linestyle='none', color='m')
+    plt.xlabel("Frequency of words")
+    plt.ylabel("frequency of frequency")
     ax.set_title(title)
     if save:
-        plt.savefig(os.path.join(path,filename,".png"))
+        plt.savefig(path+filename+".png")
     if show:
         plt.show()
     plt.close()
@@ -79,16 +78,19 @@ def plot_all_points_for_words(df, path):
             fname += 1
 
 
-def plot_model_loss(out):
-    metric = "accuracy"
-    plt.figure()
-    plt.plot(out.history[metric])
-    plt.plot(out.history["val_" + metric])
-    plt.title("model " + metric)
-    plt.ylabel(metric, fontsize="large")
-    plt.xlabel("epoch", fontsize="large")
-    plt.legend(["train", "val"], loc="best")
-    plt.show()
+def plot_model_loss(history, path=None, filename=None, save=True, show=False):
+
+    # Plot training & validation accuracy values
+    plt.plot(history.history['accuracy'])
+    plt.plot(history.history['val_‘accuracy'])
+    plt.title('Model accuracy')
+    plt.ylabel('Accuracy')
+    plt.xlabel('Epoch')
+    plt.legend(['Train', 'Test'], loc='upper left')
+    if save:
+        plt.savefig(path + filename + ".png")
+    if show:
+        plt.show()
     plt.close()
 
 

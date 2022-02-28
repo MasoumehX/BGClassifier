@@ -1,7 +1,9 @@
 "Data preparation and pre-processing scripts"
 
 import os
-from utils import split_data, read_csv_file, write_csv_file, normalize
+import numpy as np
+import pandas as pd
+from utils import *
 from plot import plot_power_law
 from collections import Counter
 
@@ -181,7 +183,6 @@ def data_cleaning(path_csv, path_txt, drop_cols=None, keep_point=None, keep_type
     data_sorted = data.sort_values(by=["fid", "time"])
     print("end of cleaning data.")
     return data_sorted
-
 
 def create_data_for_training(data, with_pad=False, max_seq_len=None, features=None, model="base"):
     """ A helper function to create data for neural networks model"""

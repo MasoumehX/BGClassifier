@@ -1,6 +1,7 @@
 "Data preparation and pre-processing scripts"
 
-from utils import *
+import os
+from utils import split_data, read_csv_file, write_csv_file, normalize
 from plot import plot_power_law
 from collections import Counter
 
@@ -227,7 +228,7 @@ def main():
                                   keep_people=keep_people)
 
     # split the data to train and test
-    df_train, df_test = split_data(data=df_clean_data, train_ratio=70, sorting=True)
+    df_train, df_test = split_data(data=df_clean_data, train_ratio=80, sorting=True)
     df_data = pd.concat([df_train, df_test], sort=True)
 
     print("info of df_data (for train and test, replace `df_data` with `df_train` or `df_test`)")
@@ -235,6 +236,6 @@ def main():
 
     # Writing the results in csv files
     where_to_write = "/data/home/masoumeh/Data/"
-    # write_csv_file(df_clean_data, path=where_to_write + "data.csv")
+    write_csv_file(df_data, path=where_to_write + "nn/df_data.csv")
     write_csv_file(df_train, path=where_to_write + "nn/df_train.csv")
     write_csv_file(df_test, path=where_to_write + "nn/df_test.csv")

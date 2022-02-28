@@ -131,6 +131,96 @@ def padding_matrix(a, max_seq_len=None, pad_value=-10, feature_dim=4):
     return Xpad
 
 
-def split_train_test(X, y, test_size=0.3, shuffle=True):
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, shuffle=shuffle, random_state=42)
-    return X_train, y_train, X_test, y_test
+# def split_train_test(X, y, test_size=0.3, shuffle=True):
+#     """ returns numpy array"""
+#     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, shuffle=shuffle, random_state=42)
+#     return X_train, y_train, X_test, y_test
+
+
+def split_data(data, train_ratio=80, sorting=True):
+    """
+        Split the data to train and test
+        :param sorting: sorting data at the end?
+        :param train_ratio: the ratio between train and test. 80 means 80% for train and 20% for test.
+        :param data
+        :return pd.dataframe train and test
+
+    """
+    groups = data.groupby(['words'])
+    test_ = []
+    train_ = []
+    for name, group in groups:
+        files = group.name.unique()
+        len_files = len(files)
+        if len_files >= 3:
+            ratio = int((len_files * train_ratio)/100)
+            train_.extend(files[:ratio])
+            test_.extend(files[ratio:])
+    df_train = data[data.name.isin(train_)]
+    df_test = data[data.name.isin(test_)]
+    if sorting:
+        df_train = df_train.sort_values(by=["fid", "time"])
+        df_test = df_test.sort_values(by=["fid", "time"])
+    return df_train, df_test
+
+
+def get_files(path):
+    if os.path.exists(path):
+        return os.listdir(path)
+    else:
+        raise FileExistsError("Path does not exist!")
+
+
+def read_multiple_csv(path, files):
+    df_all = pd.DataFrame()
+    for file in files:
+        if os.path.exists(path+file):
+            print("reading file ", file)
+            df = pd.read_csv(path+file)
+            df_all = df_all.append(df)
+    return df_all
+
+import rpy2.robjects
+import rpy2.robjects.numpy2ri
+rpy2.robjects.numpy2ri.activate()
+rpy2.robjects.r('''
+myCoordSytem <- function(x,y,v.x,v.y,new.vector=T,ortho.vector=T) {
+  matrix(cbind(x,y),ncol = 2)->m
+  nx<-c()
+  ny<-c()
+  if (new.vector==F) {
+    m[v.y,]->v.y #axis y
+    m[v.x,]->v.x #axis X
+  }
+  if (ortho.vector==T) { 
+    m[v.x,]->v.x
+    v.x->v
+    v[2:1]->v.y
+    v.y[1]*-1->v.y[1]
+  }
+  A<-v.x[1]
+  B<-v.y[1]
+  Ap<-v.x[2]
+  Bp<-v.y[2]
+  for (i in 1:length(m[,1])) {
+    a<-m[i,1]
+    b<-m[i,2]
+    newy<-(A*b-Ap*a)/(A*Bp-Ap*B)
+    newx<-(a-B*newy)/A
+    nx<-c(nx,newx)
+    ny<-c(ny,newy)
+  }
+  return(cbind(nx,ny))
+}
+
+''')
+
+
+def makeXYCoorect(df):
+    """
+    This code is taken from the ```` function in the ````
+    folder.
+
+    """
+    new_df = rpy2.robjects.globalenv['xyCorrector'](df)
+    return new_df

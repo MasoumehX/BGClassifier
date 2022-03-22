@@ -1,3 +1,4 @@
+
 from sklearn.metrics import f1_score
 from sklearn.metrics import accuracy_score
 from sklearn.metrics import precision_score
@@ -25,30 +26,35 @@ def f1_m(y_true, y_pred):
     return 2*((precision*recall)/(precision+recall+K.epsilon()))
 
 
-def precision_macro(y_true, y_pred):
-    return precision_score(y_true, y_pred, average='macro')
+def precision_measure(y_true, y_pred, average='macro'):
+    return precision_score(y_true, y_pred, average=average)
 
 
-def recall_macro(y_true, y_pred):
-    return recall_score(y_true, y_pred, average='macro')
+def recall_measure(y_true, y_pred, average='macro'):
+    return recall_score(y_true, y_pred, average=average)
 
 
-def f1_macro(y_true, y_pred):
-    return f1_score(y_true, y_pred, average='macro')
+def f1_measure(y_true, y_pred, average='macro'):
+    return f1_score(y_true, y_pred, average=average)
 
 
 def accuracy(y_true, y_pred):
     return accuracy_score(y_true, y_pred)
 
 
-def compute_acc_acc5_f1_prec_rec(y_true, y_pred):
-    dic_model = dict()
-    dic_model['acc'] = accuracy(y_true, y_pred)
-    dic_model['precision_macro'] = precision_macro(y_true, y_pred)
-    dic_model['recall_macro'] = recall_macro(y_true, y_pred)
-    dic_model['f1-macro'] = f1_macro(y_true, y_pred)
-    print('Accuracy: ', "%.2f" % (dic_model["acc"] * 100))
-    print('precision macro: ', "%.2f" % (dic_model["precision_macro"] * 100))
-    print('recall macro: ', "%.2f" % (dic_model['recall_macro'] * 100))
-    print('F1 macro: ', "%.2f" % (dic_model['f1-macro'] * 100))
-    return dic_model
+def compute_acc_prec_rec_f1(y_true, y_pred, average='macro'):
+    acc = accuracy(y_true, y_pred)
+    precision = precision_measure(y_true, y_pred, average=average)
+    recall = recall_measure(y_true, y_pred, average=average)
+    f1 = f1_measure(y_true, y_pred, average=average)
+    print('accuracy: ', "%.2f" % (acc * 100))
+    print('precision: ', "%.2f" % (precision * 100))
+    print('recall: ', "%.2f" % (recall * 100))
+    print('f1: ', "%.2f" % (f1 * 100))
+    return acc, precision, recall, f1
+
+
+
+
+
+

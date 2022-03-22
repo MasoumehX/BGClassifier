@@ -2,6 +2,9 @@ import os
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split
+from numpy import load
+from sklearn.metrics import confusion_matrix
+from plot import plot_confusion_matrix, plot_model_loss
 
 
 def read_csv_file(path, separator=","):
@@ -93,7 +96,7 @@ def get_freq_power(data, freq_col):
     return keys, values
 
 
-def padding_vector(a, max_vec=None):
+def padding_vector(a, pad_value=-10, max_vec=None):
     """
     A function to zero padding
     Parameter:
@@ -112,7 +115,7 @@ def padding_vector(a, max_vec=None):
     else:
         max_vecdim=max_vec
         print("max len: ",max_vecdim)
-    df = df.apply(lambda row: np.pad(row['flatten'], pad_width=(0, max_vecdim - row['len']), constant_values=-10, mode='constant'),axis=1)
+    df = df.apply(lambda row: np.pad(row['flatten'], pad_width=(0, max_vecdim - row['len']), constant_values=pad_value, mode='constant'),axis=1)
     return np.stack(df.values)
 
 
@@ -125,16 +128,17 @@ def padding_matrix(a, max_seq_len=None, pad_value=-10, feature_dim=4):
         numpy array (N x max_vec x M) : N = len(a), max_vec = maximum length on a, M = a[0].shape[1]
     """
     Xpad = np.full((len(a), max_seq_len, feature_dim), fill_value=pad_value, dtype=float)
+    print("max len: ", max_seq_len)
     for s, x in enumerate(a):
         seq_len = x.shape[0]
         Xpad[s, 0:seq_len, :] = x
     return Xpad
 
 
-# def split_train_test(X, y, test_size=0.3, shuffle=True):
-#     """ returns numpy array"""
-#     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, shuffle=shuffle, random_state=42)
-#     return X_train, y_train, X_test, y_test
+def split_train_test(X, y, test_size=0.2, shuffle=True):
+    """ returns numpy array"""
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, shuffle=shuffle, random_state=42, stratify=y)
+    return X_train, y_train, X_test, y_test
 
 
 def split_data(data, train_ratio=80, sorting=True):
@@ -180,47 +184,52 @@ def read_multiple_csv(path, files):
             df_all = df_all.append(df)
     return df_all
 
-import rpy2.robjects
-import rpy2.robjects.numpy2ri
-rpy2.robjects.numpy2ri.activate()
-rpy2.robjects.r('''
-myCoordSytem <- function(x,y,v.x,v.y,new.vector=T,ortho.vector=T) {
-  matrix(cbind(x,y),ncol = 2)->m
-  nx<-c()
-  ny<-c()
-  if (new.vector==F) {
-    m[v.y,]->v.y #axis y
-    m[v.x,]->v.x #axis X
-  }
-  if (ortho.vector==T) { 
-    m[v.x,]->v.x
-    v.x->v
-    v[2:1]->v.y
-    v.y[1]*-1->v.y[1]
-  }
-  A<-v.x[1]
-  B<-v.y[1]
-  Ap<-v.x[2]
-  Bp<-v.y[2]
-  for (i in 1:length(m[,1])) {
-    a<-m[i,1]
-    b<-m[i,2]
-    newy<-(A*b-Ap*a)/(A*Bp-Ap*B)
-    newx<-(a-B*newy)/A
-    nx<-c(nx,newx)
-    ny<-c(ny,newy)
-  }
-  return(cbind(nx,ny))
-}
 
-''')
+def load_dataset(set_name='head_bi_dem_norm_0.1_nn_CNN_5', where_to_read=None):
+    xtrain = load(where_to_read + "/xtrain" + "_" + set_name + ".npy")
+    ytrain = load(where_to_read + "/ytrain" + "_" + set_name + ".npy")
+    xtest = load(where_to_read + "/xtest" + "_" + set_name + ".npy")
+    ytest = load(where_to_read + "/ytest" + "_" + set_name + ".npy")
+    max_seq_len = xtest[0].shape[0]
+    return xtrain, ytrain, xtest, ytest, max_seq_len
 
 
-def makeXYCoorect(df):
-    """
-    This code is taken from the ```` function in the ````
-    folder.
+def print_test_train_size(set_name='head_bi_dem_norm_0.1_nn_CNN_5', where_to_read=None):
 
-    """
-    new_df = rpy2.robjects.globalenv['xyCorrector'](df)
-    return new_df
+    xtrain, ytrain, xtest, ytest, _ = load_dataset(set_name=set_name, where_to_read=where_to_read)
+    print('train shape: ', xtrain.shape)
+    print('test shape: ', xtest.shape)
+    print('--------------------------------------------')
+    print('Nr. Deictic (train): ', ytrain.tolist().count(0))
+    print('Nr. Sequential (train): ', ytrain.tolist().count(1))
+    print('Nr. Demarcative (train): ', ytrain.tolist().count(2))
+    print('--------------------------------------------')
+    print('Nr. Deictic (test): ', ytest.tolist().count(0))
+    print('Nr. Sequential (test): ', ytest.tolist().count(1))
+    print('Nr. Demarcative (test): ', ytest.tolist().count(2))
+
+
+def compute_confusion_matrices(y_true,
+                               y_pred,
+                               path_to_save,
+                               filename,
+                               target_names,
+                               with_plot=True):
+
+    cm = confusion_matrix(y_true=y_true, y_pred=y_pred)
+    print(cm)
+    if with_plot:
+        plot_confusion_matrix(cm,
+                              normalize=False,
+                              target_names=target_names,
+                              save=True,
+                              path=path_to_save+'confusion_matrix/',
+                              filename='confusion_matrix_'+filename)
+
+        plot_confusion_matrix(cm,
+                              normalize=True,
+                              target_names=target_names,
+                              save=True,
+                              path=path_to_save+'confusion_matrix/',
+                              filename='confusion_matrix_normalized'+filename)
+    print('Done!')

@@ -1,11 +1,10 @@
 "Data preparation and pre-processing scripts"
 
-import os
-import numpy as np
-import pandas as pd
 from utils import *
 from plot import plot_power_law
 from collections import Counter
+from numpy import save
+from pathlib import Path
 
 
 def print_data_stats(df_data):
@@ -96,14 +95,12 @@ def general_pre_process(data, drop_cols=None, keep_point=None, keep_typePoint=No
     if keep_people is not None:
         data = data[data.people.isin(keep_people)]
     # Omit null or empty values
-    data = data[~((data.x.isna()) | (data.y.isna()) | (data.point.isna()) | (data.name.isna()) | (data.frame.isna()) | (
-        data.words.isna()))]
+    data = data[~(data.isin([np.nan, np.inf, -np.inf]).any(1))]
     # Omit zero values for x or y
     data = data[~((data.x == 0.0) | (data.y == 0.0))]
     # drop duplicated values
     data = data.drop_duplicates()
     # normalize the frame and get the time
-    # TODO: I am not sure this convert frames to time!
     data["time"] = list(data.groupby("name").frame.apply(normalize))
     data = data[~data.time.isna()]
     return data
@@ -125,29 +122,10 @@ def special_pre_processing(df_data):
     return df_data
 
 
-def data_cleaning(path_csv, path_txt, drop_cols=None, keep_point=None, keep_typepoint=None, keep_people=None,
+def data_cleaning(raw_data, path_txt, drop_cols=None, keep_point=None, keep_typepoint=None, keep_people=None,
                   special_prep=True):
-    if keep_point is None:
-        keep_point = []
-    if drop_cols is None:
-        drop_cols = []
-    if keep_typepoint is None:
-        keep_typepoint = []
-    if keep_people is None:
-        keep_people = []
-    if not os.path.exists(path_csv):
-        raise FileNotFoundError("File does not exist!")
-    if path_csv.split(".")[-1] != "csv":
-        raise ValueError("The file is not a .csv file! Try another function!")
-
-    if not os.path.exists(path_txt):
-        raise FileNotFoundError("File does not exist!")
-    if path_txt.split(".")[-1] != "txt":
-        raise ValueError("The file is not a .xlsx file! Try another function!")
-
-    # reading the raw data
-    print("started reading the .csv file ...")
-    raw_data = read_csv_file(path_csv)
+    # read and merge the semantic classes for all words
+    df_semantic_classes = convert_txt_to_df(path_txt, separator="\t")
 
     # apply the general pre-processing
     print("general pre-processing started...")
@@ -158,13 +136,11 @@ def data_cleaning(path_csv, path_txt, drop_cols=None, keep_point=None, keep_type
     if special_prep:
         print("started special pre-processing ...")
         dff_clean = special_pre_processing(dff_clean)
-
-    # read and merge the semantic classes for all words
-    df_semantic_classes = convert_txt_to_df(path_txt, separator="\t")
     print("-" * 60)
     print("Words that do not have semantic class: ")
     print(dff_clean[~dff_clean.words.isin(df_semantic_classes.Expression)].words.unique())
     data = dff_clean.merge(df_semantic_classes, left_on="words", right_on="Expression", how="inner")
+    data = data.drop(["ww", "Expression"], axis=1)
     print("-" * 60)
     print("The new data base: ", data.shape)
     print("Columns to drop: ", drop_cols)
@@ -177,14 +153,15 @@ def data_cleaning(path_csv, path_txt, drop_cols=None, keep_point=None, keep_type
     data = numerical_label(data, "words", "label")
     data = numerical_label(data, "SemanticType", "classes")
     data = numerical_label(data, "name", "fid")
-    data["poi"] = data["point"].astype(int)
+    data["poi"] = data["point"].astype(float)
 
     # sorting based on the name (file name)
-    data_sorted = data.sort_values(by=["fid", "time"])
-    print("end of cleaning data.")
-    return data_sorted
+    # data = data.sort_values(by=["fid", "time"])
+    print("End of cleaning the data.")
+    return data
 
-def create_data_for_training(data, with_pad=False, max_seq_len=None, features=None, model="base"):
+
+def create_data_for_training(data, with_pad=False, class_col="classes", max_seq_len=None, features=None, pad_value=-10, model="base"):
     """ A helper function to create data for neural networks model"""
 
     groups = data.groupby(by=["fid", "words"])
@@ -195,7 +172,7 @@ def create_data_for_training(data, with_pad=False, max_seq_len=None, features=No
         f_stacks = np.stack(group[features].values)
         features_len.append(f_stacks.shape[0])
         X_data.append(f_stacks)
-        class_name = group.classes.unique()
+        class_name = group[class_col].unique()
         if len(class_name) > 1:
             raise ValueError("A word can not have more than one class!")
         y_data.append(class_name[0])
@@ -205,38 +182,87 @@ def create_data_for_training(data, with_pad=False, max_seq_len=None, features=No
         max_seq_ = max_seq_len
     else:
         max_seq_ = max(features_len)
-    if with_pad and model == "nn":
-        return padding_matrix(X_data, max_seq_len=max_seq_, feature_dim=len(features)), np.array(y_data), max_seq_
-    elif with_pad and model == "base":
-        return padding_vector(X_data), np.array(y_data), max_seq_
+    if with_pad and model.startswith("nn"):
+        return padding_matrix(X_data, max_seq_len=max_seq_, feature_dim=len(features), pad_value=pad_value), np.array(y_data), max_seq_
+    elif with_pad and model.startswith("base"):
+        return padding_vector(X_data, pad_value=pad_value), np.array(y_data), max_seq_
     else:
         return X_data, np.array(y_data), max_seq_
 
 
-def main():
-    # path to data on server
-    txt_file_path = "/data/home/masoumeh/Data/classessem.txt"
-    csv_file_path = "/data/home/agora/data/rawData/fullColectionCSV/fullColectionCSV|2022-01-19|03:42:12.csv"
+def create_train_test(df_data,
+                      setname='head',
+                      test_size=0.3,
+                      with_pad=True,
+                      pad_value=-10,
+                      feature_cols=None,
+                      features_type='norm',
+                      class_col="multi",
+                      keep_points=None,
+                      model="nn_cnn",
+                      root="./"):
+    if keep_points is not None:
+        df_data = df_data[df_data.point.isin(keep_points)]
 
+    if feature_cols is None or len(feature_cols) < 1:
+        raise ValueError("The features can not be empty!")
+
+    print("Create data for ", model)
+    xdata, ydata, max_seq_len = create_data_for_training(df_data,
+                                                         with_pad=with_pad,
+                                                         class_col=class_col,
+                                                         pad_value=pad_value,
+                                                         features=feature_cols,
+                                                         model=model)
+
+    print("split the data to train and test!")
+    xtrain, ytrain, xtest, ytest = split_train_test(xdata, ydata, test_size=test_size, shuffle=True)
+
+    filename = setname + '_' + class_col + '_' + features_type + '_' + str(test_size) + '_' + model
+    foldername = '/'.join([setname, model, str(test_size), class_col, features_type])
+    path_to_save = os.path.join(root, foldername)
+    Path(path_to_save).mkdir(parents=True, exist_ok=True)
+
+    print("Saving train and test for  ", filename)
+    save(path_to_save + "/xtrain" + "_" + filename + ".npy", xtrain)
+    save(path_to_save + "/ytrain" + "_" + filename + ".npy", ytrain)
+    save(path_to_save + "/xtest" + "_" + filename + ".npy", xtest)
+    save(path_to_save + "/ytest" + "_" + filename + ".npy", ytest)
+    return xtrain, ytrain, xtest, ytest
+
+
+def create_raw_data():
+    csv_file_path = "/mnt/shared/people/masoumeh/MA/data/data.csv"
+    # reading the raw data
+    print("start reading the .csv file ...")
+    return read_csv_file(csv_file_path)
+
+
+def create_clean_data(df_raw_data, save_data=True):
+    # path to data on server
+    path_txt = "/mnt/shared/people/masoumeh/MA/data/classessem.txt"
     # cleaning the data
-    keep_point = [2, 3, 4, 5, 6, 7]
+    keep_point = None
     keep_typepoint = ['pose_keypoints']
     keep_people = [1]
-    drop_cols = None
-    feature_cols = ["x", "y", "poi", "time"]
-    df_clean_data = data_cleaning(path_csv=csv_file_path, path_txt=txt_file_path, drop_cols=drop_cols,
+    drop_cols = ["u", "typePoint", "x2", "y2"]
+    df_clean_data = data_cleaning(df_raw_data, path_txt=path_txt, drop_cols=drop_cols,
                                   keep_point=keep_point, keep_typepoint=keep_typepoint,
                                   keep_people=keep_people)
-
-    # split the data to train and test
-    df_train, df_test = split_data(data=df_clean_data, train_ratio=80, sorting=True)
-    df_data = pd.concat([df_train, df_test], sort=True)
-
     print("info of df_data (for train and test, replace `df_data` with `df_train` or `df_test`)")
-    print_data_stats(df_data)
+    print_data_stats(df_clean_data)
 
-    # Writing the results in csv files
-    where_to_write = "/data/home/masoumeh/Data/"
-    write_csv_file(df_data, path=where_to_write + "nn/df_data.csv")
-    write_csv_file(df_train, path=where_to_write + "nn/df_train.csv")
-    write_csv_file(df_test, path=where_to_write + "nn/df_test.csv")
+    if save_data:
+        # Writing the results in csv files
+        where_to_write = "/mnt/shared/people/masoumeh/MA/data/"
+        write_csv_file(df_clean_data, path=where_to_write + "df_clean_data.csv")
+    return df_clean_data
+
+
+if __name__ == '__main__':
+    df_raw = create_raw_data()
+    create_clean_data(df_raw, save_data=False)
+
+
+
+

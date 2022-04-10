@@ -199,9 +199,10 @@ def create_train_test(df_data,
                       features_type='norm',
                       class_col="multi",
                       keep_points=None,
-                      model="nn_cnn",
+                      model="nn",
                       root="./"):
     if keep_points is not None:
+        print('Filtering points: ', keep_points)
         df_data = df_data[df_data.point.isin(keep_points)]
 
     if feature_cols is None or len(feature_cols) < 1:
@@ -214,7 +215,6 @@ def create_train_test(df_data,
                                                          pad_value=pad_value,
                                                          features=feature_cols,
                                                          model=model)
-
     print("split the data to train and test!")
     xtrain, ytrain, xtest, ytest = split_train_test(xdata, ydata, test_size=test_size, shuffle=True)
 
@@ -249,6 +249,12 @@ def create_clean_data(df_raw_data, save_data=True):
     df_clean_data = data_cleaning(df_raw_data, path_txt=path_txt, drop_cols=drop_cols,
                                   keep_point=keep_point, keep_typepoint=keep_typepoint,
                                   keep_people=keep_people)
+
+    # creating binary classification
+    df_clean_data['bi_dei'] = df_clean_data.classes.apply(lambda x: 1 if x == 0 else 0)
+    df_clean_data['bi_seq'] = df_clean_data.classes.apply(lambda x: 1 if x == 1 else 0)
+    df_clean_data['bi_dem'] = df_clean_data.classes.apply(lambda x: 1 if x == 2 else 0)
+
     print("info of df_data (for train and test, replace `df_data` with `df_train` or `df_test`)")
     print_data_stats(df_clean_data)
 

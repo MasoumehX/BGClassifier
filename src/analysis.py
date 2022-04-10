@@ -1,13 +1,5 @@
-import os
-import numpy as np
-from data import *
 from utils import *
 from plot import *
-from collections import Counter
-
-
-
-
 
 if __name__ == '__main__':
     root = "/home/masoumeh/Desktop/MasterThesis/Data/"

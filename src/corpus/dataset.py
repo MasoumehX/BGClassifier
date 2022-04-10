@@ -6,45 +6,49 @@ df_clean = read_csv_file("/mnt/shared/people/masoumeh/MA/data/df_clean_data.csv"
 
 root = "/mnt/shared/people/masoumeh/MA/data/datasets/"
 
-set_name = ['head', 'hands', 'head_hands', 'all']
+set_names = ['head', 'hands', 'head_hands', 'all']
 test_sizes = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6]
-tasks = ['bi_dem', 'bi_seq', 'bi_dei', 'multi']
+tasks = ['multi', 'bi_dem', 'bi_seq', 'bi_dei']
 features = [["nx", "ny", "poi", "time"], ["x", "y", "poi", "time"]]
-model_names = ['base_SVM', 'base_RandomForest', 'nn_CNN']
+model_names = ['base', 'nn']
 head_points = [0, 15, 16, 17, 18]
 hands_points = [2, 3, 4, 5, 6, 7]
 head_hands_points = [2, 3, 4, 5, 6, 7, 0, 15, 16, 17, 18]
 all_points = None
 
-
-for name in set_name:
+keep_points = []
+for set_name in set_names:
     for t_size in test_sizes:
         for task in tasks:
-            for m in model_names:
+            for model_name in model_names:
                 for feature in features:
                     if feature[0] == 'nx':
                         f_type = 'norm'
                     else:
                         f_type = 'unnorm'
                     if set_name == 'head':
+                        print('set name is : ', set_name)
                         keep_points = head_points
                     elif set_name == 'hands':
+                        print('set name is : ', set_name)
                         keep_points = hands_points
                     elif set_name == 'head_hands':
+                        print('set name is : ', set_name)
                         keep_points = head_hands_points
                     else:
+                        print('set name is ', str(set_name))
                         keep_points = None
-                        create_train_test(df_clean,
-                                          setname=name,
-                                          test_size=t_size,
-                                          with_pad=True,
-                                          pad_value=99999,
-                                          feature_cols=feature,
-                                          features_type=f_type,
-                                          class_col=task,
-                                          keep_points=keep_points,
-                                          model=m,
-                                          root=root)
+                    create_train_test(df_clean,
+                                      setname=set_name,
+                                      test_size=t_size,
+                                      with_pad=True,
+                                      pad_value=99999,
+                                      feature_cols=feature,
+                                      features_type=f_type,
+                                      class_col=task,
+                                      keep_points=keep_points,
+                                      model=model_name,
+                                      root=root)
 
 
 

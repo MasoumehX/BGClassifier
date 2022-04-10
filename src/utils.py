@@ -4,7 +4,7 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 from numpy import load
 from sklearn.metrics import confusion_matrix
-from plot import plot_confusion_matrix, plot_model_loss
+from plot import plot_confusion_matrix
 
 
 def read_csv_file(path, separator=","):
@@ -194,19 +194,48 @@ def load_dataset(set_name='head_bi_dem_norm_0.1_nn_CNN_5', where_to_read=None):
     return xtrain, ytrain, xtest, ytest, max_seq_len
 
 
-def print_test_train_size(set_name='head_bi_dem_norm_0.1_nn_CNN_5', where_to_read=None):
+def print_class_dist(task='multi', set_name='head_multi_norm_0.1_nn', where_to_read=None):
 
     xtrain, ytrain, xtest, ytest, _ = load_dataset(set_name=set_name, where_to_read=where_to_read)
     print('train shape: ', xtrain.shape)
     print('test shape: ', xtest.shape)
     print('--------------------------------------------')
-    print('Nr. Deictic (train): ', ytrain.tolist().count(0))
-    print('Nr. Sequential (train): ', ytrain.tolist().count(1))
-    print('Nr. Demarcative (train): ', ytrain.tolist().count(2))
-    print('--------------------------------------------')
-    print('Nr. Deictic (test): ', ytest.tolist().count(0))
-    print('Nr. Sequential (test): ', ytest.tolist().count(1))
-    print('Nr. Demarcative (test): ', ytest.tolist().count(2))
+    if task == 'multi':
+        print('Nr. Deictic (train): ', ytrain.tolist().count(0))
+        print('Nr. Sequential (train): ', ytrain.tolist().count(1))
+        print('Nr. Demarcative (train): ', ytrain.tolist().count(2))
+        print('--------------------------------------------')
+        print('Nr. Deictic (test): ', ytest.tolist().count(0))
+        print('Nr. Sequential (test): ', ytest.tolist().count(1))
+        print('Nr. Demarcative (test): ', ytest.tolist().count(2))
+
+    if task == 'bi_dei':
+        print('Nr. Others (train): ', ytrain.tolist().count(0))
+        print('Nr. Deictic (train): ', ytrain.tolist().count(1))
+        print('--------------------------------------------')
+        print('Nr. Others (test): ', ytest.tolist().count(0))
+        print('Nr. Deictic (test): ', ytest.tolist().count(1))
+
+    if task == 'bi_dei':
+        print('Nr. Others (train): ', ytrain.tolist().count(0))
+        print('Nr. Deictic (train): ', ytrain.tolist().count(1))
+        print('--------------------------------------------')
+        print('Nr. Others (test): ', ytest.tolist().count(0))
+        print('Nr. Deictic (test): ', ytest.tolist().count(1))
+
+    if task == 'bi_seq':
+        print('Nr. Others (train): ', ytrain.tolist().count(0))
+        print('Nr. Sequential (train): ', ytrain.tolist().count(1))
+        print('--------------------------------------------')
+        print('Nr. Others (test): ', ytest.tolist().count(0))
+        print('Nr. Sequential (test): ', ytest.tolist().count(1))
+
+    if task == 'bi_dem':
+        print('Nr. Others (train): ', ytrain.tolist().count(0))
+        print('Nr. Demarcative (train): ', ytrain.tolist().count(1))
+        print('--------------------------------------------')
+        print('Nr. Others (test): ', ytest.tolist().count(0))
+        print('Nr. Demarcative (test): ', ytest.tolist().count(1))
 
 
 def compute_confusion_matrices(y_true,
@@ -214,7 +243,8 @@ def compute_confusion_matrices(y_true,
                                path_to_save,
                                filename,
                                target_names,
-                               with_plot=True):
+                               with_plot=True,
+                               iters=0):
 
     cm = confusion_matrix(y_true=y_true, y_pred=y_pred)
     print(cm)
@@ -224,12 +254,12 @@ def compute_confusion_matrices(y_true,
                               target_names=target_names,
                               save=True,
                               path=path_to_save+'confusion_matrix/',
-                              filename='confusion_matrix_'+filename)
+                              filename='confusion_matrix_'+filename+"_"+str(iters))
 
         plot_confusion_matrix(cm,
                               normalize=True,
                               target_names=target_names,
                               save=True,
                               path=path_to_save+'confusion_matrix/',
-                              filename='confusion_matrix_normalized'+filename)
+                              filename='confusion_matrix_normalized'+filename+"_"+str(iters))
     print('Done!')
